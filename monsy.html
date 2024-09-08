@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Glowing Monster</title>
+    <title>Enhanced Tentacle Monster</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            background: radial-gradient(circle, #001f3f, #001429, #000e1b);
+            background-color: black;
         }
         canvas {
             display: block;
@@ -18,158 +18,183 @@
 <body>
     <canvas id="canvas"></canvas>
     <script>
-        let canvas = document.getElementById("canvas"),
-            c = canvas.getContext("2d"),
-            w = canvas.width = window.innerWidth,
-            h = canvas.height = window.innerHeight,
-            dots = [],
-            mouse = { x: w / 2, y: h / 2 },
-            last_mouse = { x: w / 2, y: h / 2 },
-            monsterSpeed = 2; // Speed of monster travel between dots
+        window.onload = function() {
+            const canvas = document.getElementById('canvas');
+            const c = canvas.getContext('2d');
+            let w = canvas.width = window.innerWidth;
+            let h = canvas.height = window.innerHeight;
 
-        // Function to create dots (stars)
-        function createDots() {
-            dots = [];
-            for (let i = 0; i < 300; i++) { // Increased number of dots
-                let dot = {
-                    x: Math.random() * w,
-                    y: Math.random() * h,
-                    radius: Math.random() * 2 + 0.5, // Random small sizes
-                    glow: Math.random() * 2
-                };
-                dots.push(dot);
-            }
-        }
+            let mouse = { x: false, y: false };
+            let last_mouse = {};
+            let dots = [];
 
-        // Function to draw dots
-        function drawDots() {
-            for (let i = 0; i < dots.length; i++) {
-                let dot = dots[i];
-                c.beginPath();
-                c.arc(dot.x, dot.y, dot.radius, 0, Math.PI * 2);
-                c.fillStyle = `rgba(0, ${Math.floor(100 + dot.glow * 100)}, 255, 0.8)`;
-                c.shadowBlur = 5 + dot.glow * 5;
-                c.shadowColor = `rgba(0, ${Math.floor(100 + dot.glow * 100)}, 255, 0.8)`;
-                c.fill();
-            }
-        }
-
-        // Function to draw the glowing monster face
-        function drawMonsterFace() {
-            c.beginPath();
-            c.arc(mouse.x, mouse.y, 10, 0, Math.PI * 2);
-            c.fillStyle = 'rgba(0, 150, 255, 1)';
-            c.shadowBlur = 15;
-            c.shadowColor = 'rgba(0, 150, 255, 1)';
-            c.fill();
-        }
-
-        // Tentacle object
-        class Tentacle {
-            constructor(x, y, length, points) {
-                this.x = x;
-                this.y = y;
-                this.length = length;
-                this.points = [];
-                this.targetDot = null; // Target dot for the monster to travel through
-                this.createPoints(points);
-            }
-
-            createPoints(num) {
-                for (let i = 0; i < num; i++) {
-                    let point = {
-                        pos: { x: this.x, y: this.y },
-                        vel: { x: 0, y: 0 }
-                    };
-                    this.points.push(point);
+            // Create random dots across the canvas (stars)
+            function createDots() {
+                for (let i = 0; i < 200; i++) {
+                    dots.push({
+                        x: Math.random() * w,
+                        y: Math.random() * h,
+                        radius: Math.random() * 2 + 0.5,
+                        alpha: Math.random() * 0.7 + 0.3
+                    });
                 }
             }
 
-            move() {
-                // Find the closest dot to travel towards
-                if (!this.targetDot || dist(this.targetDot.x, this.targetDot.y, mouse.x, mouse.y) < 5) {
-                    this.targetDot = dots[Math.floor(Math.random() * dots.length)];
+            // Draw dots (stars)
+            function drawDots() {
+                for (let i = 0; i < dots.length; i++) {
+                    c.beginPath();
+                    c.arc(dots[i].x, dots[i].y, dots[i].radius, 0, Math.PI * 2);
+                    c.fillStyle = `rgba(0, 255, 255, ${dots[i].alpha})`;
+                    c.fill();
                 }
-                
-                // Update monster movement towards target dot
-                let angle = Math.atan2(this.targetDot.y - this.y, this.targetDot.x - this.x);
-                this.x += Math.cos(angle) * monsterSpeed;
-                this.y += Math.sin(angle) * monsterSpeed;
+            }
 
-                for (let i = this.points.length - 1; i >= 0; i--) {
-                    if (i == 0) {
-                        this.points[i].pos = { x: this.x, y: this.y };
+            function dist(x1, y1, x2, y2) {
+                return Math.hypot(x2 - x1, y2 - y1);
+            }
+
+            class Segment {
+                constructor(parent, length, angle, first) {
+                    this.first = first;
+                    if (first) {
+                        this.pos = { x: parent.x, y: parent.y };
                     } else {
-                        this.points[i].pos = {
-                            x: (this.points[i].pos.x + this.points[i - 1].pos.x) / 2,
-                            y: (this.points[i].pos.y + this.points[i - 1].pos.y) / 2
-                        };
+                        this.pos = { x: parent.nextPos.x, y: parent.nextPos.y };
+                    }
+                    this.l = length;
+                    this.ang = angle;
+                    this.nextPos = { x: this.pos.x + this.l * Math.cos(this.ang), y: this.pos.y + this.l * Math.sin(this.ang) };
+                }
+
+                update(t) {
+                    this.ang = Math.atan2(t.y - this.pos.y, t.x - this.pos.x);
+                    this.pos.x = t.x;
+                    this.pos.y = t.y;
+                    this.nextPos.x = this.pos.x + this.l * Math.cos(this.ang);
+                    this.nextPos.y = this.pos.y + this.l * Math.sin(this.ang);
+                }
+
+                show() {
+                    c.lineTo(this.nextPos.x, this.nextPos.y);
+                }
+            }
+
+            class Tentacle {
+                constructor(x, y, l, n) {
+                    this.x = x;
+                    this.y = y;
+                    this.l = l;
+                    this.n = n;
+                    this.t = {};
+                    this.rand = Math.random();
+                }
+
+                createPoints() {
+                    this.points = [];
+                    for (let i = 0; i < this.n; i++) {
+                        if (i === 0) {
+                            this.points.push(new Segment(this, this.l / this.n * i, Math.PI * 2 * this.rand, true));
+                        } else {
+                            this.points.push(new Segment(this.points[i - 1], this.l / this.n * i, Math.PI * 2 * this.rand, false));
+                        }
                     }
                 }
-            }
 
-            show() {
-                c.beginPath();
-                c.moveTo(this.x, this.y);
-                for (let i = 0; i < this.points.length; i++) {
-                    c.lineTo(this.points[i].pos.x, this.points[i].pos.y);
+                move(last_target) {
+                    for (let i = 0; i < this.points.length; i++) {
+                        let t = {};
+                        if (i === 0) {
+                            t = {
+                                x: (this.points[i].pos.x + last_target.x) / 2,
+                                                                y: (this.points[i].pos.y + last_target.y) / 2
+                            };
+                        } else {
+                            t = {
+                                x: (this.points[i - 1].pos.x + this.points[i].pos.x) / 2,
+                                y: (this.points[i - 1].pos.y + this.points[i].pos.y) / 2
+                            };
+                        }
+                        this.points[i].update(t);
+                    }
                 }
-                let gradient = c.createLinearGradient(this.x, this.y, mouse.x, mouse.y);
-                gradient.addColorStop(0, 'rgba(0, 150, 255, 0.8)');
-                gradient.addColorStop(1, 'rgba(0, 50, 255, 0.3)');
-                c.strokeStyle = gradient;
-                c.lineWidth = 2;
-                c.stroke();
-            }
-        }
 
-        let tentacles = [];
-
-        function createTentacles() {
-            tentacles = [];
-            for (let i = 0; i < 8; i++) {
-                let randX = w / 2,
-                    randY = h / 2;
-                tentacles.push(new Tentacle(randX, randY, 200, 20));
-            }
-        }
-
-        function animate() {
-            c.clearRect(0, 0, w, h);
-
-            // Draw the background glow
-            c.fillStyle = 'rgba(0, 0, 50, 0.3)';
-            c.fillRect(0, 0, w, h);
-
-            // Draw the dots (stars)
-            drawDots();
-
-            // Draw the tentacles
-            for (let i = 0; i < tentacles.length; i++) {
-                tentacles[i].move();
-                tentacles[i].show();
+                show() {
+                    if (dist(mouse.x, mouse.y, this.x, this.y) < 100) {
+                        c.globalAlpha = 0.8;
+                    } else {
+                        c.globalAlpha = 0.3;
+                    }
+                    c.beginPath();
+                    c.moveTo(this.x, this.y);
+                    for (let i = 0; i < this.points.length; i++) {
+                        this.points[i].show();
+                    }
+                    c.strokeStyle = "rgba(0, 150, 255, 0.8)";
+                    c.lineWidth = 2;
+                    c.stroke();
+                }
             }
 
-            // Draw the glowing monster face
-            drawMonsterFace();
+            let tentacles = [];
 
-            requestAnimationFrame(animate);
-        }
+            function createTentacles() {
+                tentacles = [];
+                for (let i = 0; i < 10; i++) {
+                    let randX = Math.random() * w;
+                    let randY = Math.random() * h;
+                    tentacles.push(new Tentacle(randX, randY, 200, 30));
+                    tentacles[i].createPoints();
+                }
+            }
 
-        window.addEventListener('resize', function() {
-            w = canvas.width = window.innerWidth;
-            h = canvas.height = window.innerHeight;
+            function drawMonsterFace() {
+                c.beginPath();
+                c.arc(mouse.x, mouse.y, 15, 0, Math.PI * 2);
+                c.fillStyle = 'rgba(0, 150, 255, 0.9)';
+                c.shadowBlur = 15;
+                c.shadowColor = 'rgba(0, 150, 255, 0.9)';
+                c.fill();
+            }
+
+            canvas.onmousemove = function(e) {
+                last_mouse.x = mouse.x;
+                last_mouse.y = mouse.y;
+
+                mouse.x = e.pageX - canvas.offsetLeft;
+                mouse.y = e.pageY - canvas.offsetTop;
+            };
+
+            function animate() {
+                c.clearRect(0, 0, w, h);
+
+                // Draw the dots (stars)
+                drawDots();
+
+                // Draw the tentacles
+                for (let i = 0; i < tentacles.length; i++) {
+                    tentacles[i].move(mouse);
+                    tentacles[i].show();
+                }
+
+                // Draw the glowing monster face
+                drawMonsterFace();
+
+                requestAnimationFrame(animate);
+            }
+
+            window.addEventListener('resize', function() {
+                w = canvas.width = window.innerWidth;
+                h = canvas.height = window.innerHeight;
+                createDots();
+                createTentacles();
+            });
+
             createDots();
             createTentacles();
-        });
-
-        createDots();
-        createTentacles();
-        animate();
-
-        function dist(x1, y1, x2, y2) {
-            return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
-        }
+            animate();
+        };
     </script>
 </body>
 </html>
+
